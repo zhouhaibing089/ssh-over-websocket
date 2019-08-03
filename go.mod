@@ -3,8 +3,8 @@ module github.com/zhouhaibing089/sshproxy
 go 1.12
 
 require (
-	github.com/spf13/cobra v0.0.5
-	k8s.io/apimachinery v0.0.0-20190727130956-f97a4e5b4abc
-	k8s.io/apiserver v0.0.0-20190726023815-781c3cd1b3dc
-	k8s.io/klog v0.3.1
+	github.com/gorilla/mux v1.7.3
+	github.com/gorilla/websocket v1.4.0
+	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
+	golang.org/x/sys v0.0.0-20190801041406-cbf593c0f2f3
 )
