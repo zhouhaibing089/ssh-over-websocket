@@ -1,13 +1,11 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ssh/terminal"
@@ -20,8 +18,6 @@ func main() {
 		os.Exit(1)
 	}
 	host := os.Args[1]
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	inFD := int(os.Stdin.Fd())
 	state, err := terminal.MakeRaw(inFD)
 	if err != nil {
@@ -70,56 +66,42 @@ func main() {
 	}()
 
 	// send the output from server to stdout
+	closed := false
 	go func() {
 		for {
 			mt, r, err := conn.NextReader()
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseAbnormalClosure) {
+				closed = true
 				return
 			}
 			if err != nil {
-				terminal.Restore(inFD, state)
-				cancel()
+				log.Printf("failed to get next reader: %s", err)
 				return
 			}
 			if mt != websocket.BinaryMessage {
-				terminal.Restore(inFD, state)
-				cancel()
-				return
+				continue
 			}
 			if _, err := io.Copy(os.Stdout, r); err != nil {
 				log.Printf("failed to read from server: %v", err)
-				terminal.Restore(inFD, state)
-				cancel()
+				return
 			}
 		}
 	}()
-	if err := File2WS(ctx, cancel, os.Stdin, conn); err == io.EOF {
-		if err := conn.WriteControl(websocket.CloseMessage,
-			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
-			time.Now().Add(10*time.Second)); err == websocket.ErrCloseSent {
-		} else if err != nil {
-			log.Printf("failed to send close message: %v", err)
-		}
-	} else if err == websocket.ErrCloseSent {
-		terminal.Restore(inFD, state)
-		cancel()
-	}
-}
 
-func File2WS(ctx context.Context, cancel func(), src io.Reader, dst *websocket.Conn) error {
-	defer cancel()
 	for {
-		if ctx.Err() != nil {
-			return nil
-		}
-		b := make([]byte, 32*1024)
-		if n, err := src.Read(b); err != nil {
-			return err
+		buf := make([]byte, 32*1024)
+		if n, err := os.Stdin.Read(buf); err != nil {
+			log.Printf("failed to read from stdin: %s", err)
+			return
 		} else {
-			b = b[:n]
+			buf = buf[:n]
 		}
-		if err := dst.WriteMessage(websocket.BinaryMessage, b); err != nil {
-			return err
+		if closed {
+			return
+		}
+		if err := conn.WriteMessage(websocket.BinaryMessage, buf); err != nil {
+			log.Printf("failed to write to server: %s", err)
+			return
 		}
 	}
 }
