@@ -7,6 +7,7 @@ sshproxy is an http server which proxies interactions to an ssh session.
 
 ```console
 $ go get github.com/zhouhaibing089/sshproxy/cmd/sshproxy
+$ go get github.com/zhouhaibing089/sshproxy/cmd/kubectl-ssh
 ```
 
 ## Usage

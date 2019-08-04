@@ -30,7 +30,7 @@ var (
 
 func init() {
 	// flags related to ssh config
-	flag.StringVar(&username, "username", "", "username for ssh login")
+	flag.StringVar(&username, "user", "", "username for ssh login")
 	flag.StringVar(&password, "password", "", "password paired with username for ssh login")
 	flag.StringVar(&sshKeyFile, "ssh-key-file", "", "path to ssh key paired with username for ssh login")
 
@@ -150,9 +150,15 @@ func handleSSH(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	closed := false
+
 	// read from client
 	go func() {
 		for {
+			if closed {
+				return
+			}
+
 			mt, reader, err := conn.NextReader()
 			if err != nil {
 				log.Printf("failed to read from client: %s", err)
@@ -196,6 +202,10 @@ func handleSSH(w http.ResponseWriter, r *http.Request) {
 		buf := make([]byte, 1024)
 		n, err := stdout.Read(buf)
 		if err != nil {
+			if err == io.EOF {
+				closed = true
+				return
+			}
 			log.Printf("failed to read from remote: %s", err)
 			return
 		}
